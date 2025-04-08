@@ -23,5 +23,12 @@ The template assumes the existince of:
 - Private DNS Zones
 - Log Analytics Workspace
 
+## Deploy
+First you need to create a bicep parameters file.
+- If you have the Bicep extension, you can right click main and choose Generate Parametes File.
+
+Then deploy the main.bicep file.
+- Again, with the Bicep extension you can right click and then follow the prompts to supply your subscription and resource group and select the parameters file.
+
 ## Ackowledgements
 This project was inspired by [Azure Quick Start Templates](https://github.com/Azure/azure-quickstart-templates), specifically [Deploy Secure Azure AI Foundry with a managed virtual network](https://github.com/Azure/azure-quickstart-templates/tree/master/quickstarts/microsoft.machinelearningservices/aifoundry-networking-aoao). We have adapted a portion of their work to build upon and extend it for our specific use case. Special thanks to the contributors of the original repository for their valuable work.
