@@ -63,11 +63,26 @@ param connectionAuthType string = 'AAD'
 @description('Specifies the name for the Azure OpenAI Service connection.')
 param aiServicesConnectionName string = ''
 
+@description('Specifies the name of the Azure AI Search resource')
+param aiSearchName string
+
+@description('Specifies the authentication method for the AI Search connection.')
+@allowed([
+  'ApiKey'
+  'AAD'
+  'ManagedIdentity'
+  'None'
+])
+param aiSearchConnectionAuthType string
+
+@description('Specifies the name for the AI Search connection.')
+param aiSearchConnectionName string = ''
+
 @description('Specifies the resource id of the Log Analytics workspace.')
 param workspaceId string
 
-@description('Specifies the object id of a Miccrosoft Entra ID user. In general, this the object id of the system administrator who deploys the Azure resources.')
-param userObjectId string = ''
+// @description('Specifies the object id of a Miccrosoft Entra ID user. In general, this the object id of the system administrator who deploys the Azure resources.')
+// param userObjectId string = ''
 
 @description('Optional. The name of logs that will be streamed.')
 @allowed([
@@ -122,6 +137,10 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' ex
   name: aiServicesName
 }
 
+resource aiSearch 'Microsoft.Search/searchServices@2023-11-01' existing = {
+  name: aiSearchName
+}
+
 resource hub 'Microsoft.MachineLearningServices/workspaces@2024-04-01-preview' = {
   name: name
   location: location
@@ -170,23 +189,43 @@ resource hub 'Microsoft.MachineLearningServices/workspaces@2024-04-01-preview' =
         : null
     }
   }
-}
 
-resource azureMLDataScientistRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: 'f6c7c914-8db3-469d-8ca1-694a8f32e121'
-  scope: subscription()
-}
-
-// This role assignment grants the user the required permissions to start a Prompt Flow in a compute service within Azure AI Foundry
-resource azureMLDataScientistUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(userObjectId)) {
-  name: guid(hub.id, azureMLDataScientistRole.id, userObjectId)
-  scope: hub
-  properties: {
-    roleDefinitionId: azureMLDataScientistRole.id
-    principalType: 'User'
-    principalId: userObjectId
+  resource aiSearchConnection 'connections@2024-10-01' = {
+    name: !empty(aiSearchConnectionName) ? aiSearchConnectionName : toLower('${aiSearch.name}-connection')
+    properties: {
+      category: 'CognitiveSearch'
+      target: 'https://${aiSearchName}.search.windows.net'
+    #disable-next-line BCP225 
+      authType: aiSearchConnectionAuthType 
+      isSharedToAll: true 
+      metadata: { 
+        ApiType: 'Azure' 
+        ResourceId: aiSearch.id 
+      } 
+      credentials: aiSearchConnectionAuthType == 'ApiKey' 
+      ? { 
+        key: aiSearch.listAdminKeys().primaryKey 
+      } 
+      : null 
+    } 
   }
 }
+
+// resource azureMLDataScientistRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+//   name: 'f6c7c914-8db3-469d-8ca1-694a8f32e121'
+//   scope: subscription()
+// }
+
+// // This role assignment grants the user the required permissions to start a Prompt Flow in a compute service within Azure AI Foundry
+// resource azureMLDataScientistUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(userObjectId)) {
+//   name: guid(hub.id, azureMLDataScientistRole.id, userObjectId)
+//   scope: hub
+//   properties: {
+//     roleDefinitionId: azureMLDataScientistRole.id
+//     principalType: 'User'
+//     principalId: userObjectId
+//   }
+// }
 
 resource diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
   name: diagnosticSettingsName

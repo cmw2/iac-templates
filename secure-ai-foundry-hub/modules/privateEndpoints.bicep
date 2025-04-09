@@ -53,6 +53,12 @@ param aiServicesPrivateEndpointName string
 @description('Specifies the name of the private endpoint to the Azure AI Search.')
 param aiSearchPrivateEndpointName string
 
+// @description('Specifies the resource ID of the Machine Learning Compute.')
+// param mlComputeId string = ''
+
+// @description('Specifies the name of the private endpoint for the Machine Learning Compute.')
+// param mlComputePrivateEndpointName string = ''
+
 @description('Specifies the location.')
 param location string = resourceGroup().location
 
@@ -333,3 +339,42 @@ resource aiSearchPrivateDnsZoneGroup 'Microsoft.Network/privateEndpoints/private
     ]
   }
 }
+
+// Add a private endpoint for the Machine Learning Compute resource
+
+// resource mlComputePrivateEndpoint 'Microsoft.Network/privateEndpoints@2023-11-01' = {
+//   name: mlComputePrivateEndpointName
+//   location: location
+//   tags: tags
+//   properties: {
+//     privateLinkServiceConnections: [
+//       {
+//         name: mlComputePrivateEndpointName
+//         properties: {
+//           privateLinkServiceId: mlComputeId
+//           groupIds: [
+//             'amlcompute'
+//           ]
+//         }
+//       }
+//     ]
+//     subnet: {
+//       id: subnetId
+//     }
+//   }
+// }
+
+// resource mlComputePrivateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2023-11-01' = {
+//   parent: mlComputePrivateEndpoint
+//   name: 'default'
+//   properties: {
+//     privateDnsZoneConfigs: [
+//       {
+//         name: replace(privateDnsZones.outputs.mlApiDnsZoneName, '.', '-')
+//         properties: {
+//           privateDnsZoneId: privateDnsZones.outputs.mlApiDnsZoneId
+//         }
+//       }
+//     ]
+//   }
+// }

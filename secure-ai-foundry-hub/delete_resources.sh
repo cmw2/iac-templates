@@ -61,6 +61,20 @@ delete_resources_by_type_and_kind() {
     resource_id=$(echo "$resource" | cut -f2)
     echo "Deleting resource: Name=$resource_name, ID=$resource_id"
     az resource delete --ids "$resource_id"
+
+    # # Special handling for Key Vaults
+    # if [[ "$resource_type" == "Microsoft.KeyVault/vaults" ]]; then
+    # echo "Purging soft-deleted Key Vault: $resource_name"
+    # sleep 5
+    # az keyvault purge --name "$resource_name"
+    # fi
+
+    # # Special handling for Azure AI Services
+    # if [[ "$resource_type" == "Microsoft.CognitiveServices/accounts" ]]; then
+    #     echo "Purging soft-deleted Azure AI Service: $resource_name"
+    #     sleep 5
+    #     az cognitiveservices account purge -g $RESOURCE_GROUP --name "$resource_name" --location "$(az resource show --ids "$resource_id" --query location -o tsv)"
+    # fi
   done
 }
 

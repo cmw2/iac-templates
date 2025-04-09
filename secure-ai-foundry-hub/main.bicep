@@ -282,12 +282,42 @@ param aiSearchName string = ''
 @description('Specifies whether to disable local authentication for Azure AI Search.')
 param aiSearchDisableLocalAuth bool = true
 
+
+@description('Specifies the authentication method for the AI Search connection.')
+@allowed([
+  'ApiKey'
+  'AAD'
+  'ManagedIdentity'
+  'None'
+])
+param aiSearchConnectionAuthType string
+
 @description('Specifies whether to allow public network access for Azure AI Search.')
 @allowed([
   'Disabled'
   'Enabled'
 ])
 param aiSearchPublicNetworkAccess string = 'Disabled'
+
+@description('Determines whether to assign roles to the user and services.')
+param assignRoles bool = true
+
+
+// // Parameters for Machine Learning Compute
+// @description('Specifies the name of the Azure Machine Learning Compute resource.')
+// param mlComputeName string = ''
+
+// @description('Specifies the size of the Azure Machine Learning Compute cluster.')
+// param mlComputeVmSize string = 'Standard_DS3_v2'
+
+// @description('Specifies the minimum number of nodes for the compute cluster.')
+// param mlComputeMinNodes int = 0
+
+// @description('Specifies the maximum number of nodes for the compute cluster.')
+// param mlComputeMaxNodes int = 4
+
+// @description('Specifies the name of the private endpoint for the Machine Learning Compute.')
+// param mlComputePrivateEndpointName string = ''
 
 @description('Specifies the resource tags for all the resoources.')
 param tags object = {}
@@ -331,8 +361,8 @@ module keyVault 'modules/keyVault.bicep' = {
     softDeleteRetentionInDays: keyVaultSoftDeleteRetentionInDays
     workspaceId: workspace.id
 
-    // role assignments
-    userObjectId: userObjectId
+    // // role assignments
+    // userObjectId: userObjectId
   }
 }
 
@@ -372,9 +402,9 @@ module storageAccount 'modules/storageAccount.bicep' = {
     supportsHttpsTrafficOnly: storageAccountSupportsHttpsTrafficOnly
     workspaceId: workspace.id
 
-    // role assignments
-    userObjectId: userObjectId
-    aiServicesPrincipalId: aiServices.outputs.principalId
+    // // role assignments
+    // userObjectId: userObjectId
+    // aiServicesPrincipalId: aiServices.outputs.principalId
   }
 }
 
@@ -394,48 +424,50 @@ module aiServices 'modules/aiServices.bicep' = {
     workspaceId: workspace.id
 
     // role assignments
-    userObjectId: userObjectId
+    //userObjectId: userObjectId
   }
 }
 
-// Add AI Search module
-module aiSearch 'br/public:avm/res/search/search-service:0.9.2' = {
-  name: 'aiSearchDeployment'
-  params: {
-    name: empty(aiSearchName) ? toLower('${prefix}-ai-search-${suffix}') : aiSearchName
-    location: location
-    disableLocalAuth: aiSearchDisableLocalAuth
+// // Add AI Search module
+// module aiSearchOld 'br/public:avm/res/search/search-service:0.9.2' = {
+//   name: 'aiSearchDeploymentOld'
+//   params: {
+//     name: empty(aiSearchName) ? toLower('${prefix}-ai-search-${suffix}') : aiSearchName
+//     location: location
+//     disableLocalAuth: aiSearchDisableLocalAuth
+//     publicNetworkAccess: aiSearchPublicNetworkAccess
+//     networkRuleSet: {
+//       bypass: 'AzurePortal'
+//     }    
+//     managedIdentities: {
+//       systemAssigned: true
+//     }
+//     tags: tags
+//   }
+// }
+
+
+resource aiSearch 'Microsoft.Search/searchServices@2025-02-01-preview' = {
+  name: empty(aiSearchName) ? toLower('${prefix}-ai-search-${suffix}') : aiSearchName
+  location: location
+  tags: tags
+  sku: {
+    name: 'standard'
+  }
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    replicaCount: 1
+    partitionCount: 1
+    hostingMode: 'default'
     publicNetworkAccess: aiSearchPublicNetworkAccess
-    managedIdentities: {
-      systemAssigned: true
+    networkRuleSet: {
+      ipRules: []
+      bypass: 'AzureServices'
     }
-    roleAssignments: [
-      {
-        principalId: userObjectId
-        roleDefinitionIdOrName: 'Search Service Contributor'
-      }
-      {
-        principalId: userObjectId
-        roleDefinitionIdOrName: 'Search Index Data Contributor'
-      }
-      {
-        principalId: aiServices.outputs.principalId
-        roleDefinitionIdOrName: 'Search Service Contributor'
-      }
-      {
-        principalId: aiServices.outputs.principalId
-        roleDefinitionIdOrName: 'Search Index Data Contributor'
-      }
-      {
-        principalId: hub.outputs.principalId
-        roleDefinitionIdOrName: 'Search Service Contributor'
-      }
-      {
-        principalId: hub.outputs.principalId
-        roleDefinitionIdOrName: 'Search Index Data Contributor'
-      }
-    ]
-    tags: tags
+    disableLocalAuth: aiSearchDisableLocalAuth
+    semanticSearch: 'standard'
   }
 }
 
@@ -463,7 +495,7 @@ module privateEndpoints './modules/privateEndpoints.bicep' = {
     hubWorkspaceId: hub.outputs.id
     aiServicesPrivateEndpointName: empty(aiServicesPrivateEndpointName) ? toLower('${prefix}-ai-services-pe-${suffix}') : aiServicesPrivateEndpointName
     aiServicesId: aiServices.outputs.id
-    aiSearchId: aiSearch.outputs.resourceId
+    aiSearchId: aiSearch.id // outputs.resourceId
     aiSearchPrivateEndpointName: empty(aiSearchPrivateEndpointName) ? toLower('${prefix}-ai-search-pe-${suffix}') : aiSearchPrivateEndpointName
     location: location
     tags: tags
@@ -483,6 +515,7 @@ module hub 'modules/hub.bicep' = {
 
     // dependent resources
     aiServicesName: aiServices.outputs.name
+    aiSearchName: aiSearch.name // .outputs.name
     applicationInsightsId: applicationInsights.outputs.id
     containerRegistryId: containerRegistry.outputs.id
     keyVaultId: keyVault.outputs.id
@@ -495,8 +528,9 @@ module hub 'modules/hub.bicep' = {
     isolationMode: hubIsolationMode
     workspaceId: workspace.id
 
-    // role assignments
-    userObjectId: userObjectId
+    aiSearchConnectionAuthType: aiSearchConnectionAuthType
+    // // role assignments
+    // userObjectId: userObjectId
   }
 }
 
@@ -514,9 +548,141 @@ module project 'modules/project.bicep' = {
     hubId: hub.outputs.id
     workspaceId: workspace.id
 
-    // role assignments
-    userObjectId: userObjectId
-    aiServicesPrincipalId: aiServices.outputs.principalId
+    // // role assignments
+    // userObjectId: userObjectId
+    // aiServicesPrincipalId: aiServices.outputs.principalId
+  }
+}
+module roleAssignments './modules/roleAssignments.bicep' = if (assignRoles) {
+  name: 'roleAssignments'
+  params: {
+    roleAssignments: [
+      // Azure AI Search roles for Azure AI Services/OpenAI
+      {
+        principalId: aiServices.outputs.principalId
+        roleDefinitionId: '8ebe5a00-799e-43f5-93ac-243d3dce84a7' // Search Index Data Contributor
+      }
+      {
+        principalId: aiServices.outputs.principalId
+        roleDefinitionId: '1407120a-92aa-4202-b7e9-c0e197c71c8f' // Search Index Data Reader
+      }
+      {
+        principalId: aiServices.outputs.principalId
+        roleDefinitionId: '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // Search Service Contributor
+      }
+      {
+        principalId: hub.outputs.principalId
+        roleDefinitionId: 'b556d68e-0be0-4f35-a333-ad7ee1ce17ea' // Azure AI Enterprise Network Connection Approver
+      }
+      // Azure AI Services/OpenAI roles for Azure AI Search
+      {
+        principalId: aiSearch.identity.principalId // outputs.?systemAssignedMIPrincipalId
+        roleDefinitionId: '25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68' // Cognitive Services Contributor
+      }
+      {
+        principalId: aiSearch.identity.principalId // .outputs.?systemAssignedMIPrincipalId
+        roleDefinitionId: 'a001fd3d-188f-4b5d-821b-7da978bf7442' // Cognitive Services OpenAI Contributor
+      }
+
+      // Azure Storage Account roles for Azure AI Search
+      {
+        principalId: aiSearch.identity.principalId // .outputs.?systemAssignedMIPrincipalId
+        roleDefinitionId: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe' // Storage Blob Data Contributor
+      }
+      {
+        principalId: project.outputs.principalId
+        roleDefinitionId: 'acdd72a7-3385-48ef-bd42-f606fba81ae7' // Reader
+      }
+      {
+        principalId: project.outputs.principalId
+        roleDefinitionId: '64702f94-c441-49e6-a78b-ef80e0188fee' // Azure AI Developer
+      }
+      {
+        principalId: project.outputs.principalId
+        roleDefinitionId: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe' // Storage Blob Data Contributor
+      }
+      {
+        principalId: project.outputs.principalId
+        roleDefinitionId: '69566ab7-960f-475b-8e7c-b3118f30c6bd' // Storage File Data Privileged Contributor
+      }
+
+      // Azure Storage Account roles for Azure AI Services/OpenAI
+      {
+        principalId: aiServices.outputs.principalId
+        roleDefinitionId: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe' // Storage Blob Data Contributor
+      }
+      {
+        principalId: aiServices.outputs.principalId
+        roleDefinitionId: 'f6c7c914-8db3-469d-8ca1-694a8f32e121' // Azure ML Data Scientist
+      }
+    ]
+  }
+}
+
+module amlRoleAssignments './modules/roleAssignments.bicep' = if (assignRoles) {
+  name: 'roleAssignments'
+  params: {
+    roleAssignments: [
+      {
+        principalId: '02bef2cc-1387-4918-b91d-bbfc606fb7ed' // Azure Machine Learning Identity
+        roleDefinitionId: 'b24988ac-6180-42a0-ab88-20f7382dd24c' // Contributor
+      }
+    ]
+  }
+}
+
+module userRoleAssignments './modules/roleAssignments.bicep' = if (assignRoles) {
+  name: 'userRoleAssignments'
+  params: {
+    roleAssignments: [
+      // Azure AI Search roles for the developer
+      {
+        principalId: userObjectId
+        roleDefinitionId: '64702f94-c441-49e6-a78b-ef80e0188fee' // Azure AI Developer
+      }
+      {
+        principalId: userObjectId
+        roleDefinitionId: '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // Search Services Contributor
+      }
+      {
+        principalId: userObjectId
+        roleDefinitionId: '8ebe5a00-799e-43f5-93ac-243d3dce84a7' // Search Index Data Contributor
+      }
+      // Azure AI Services/OpenAI roles for the developer
+      {
+        principalId: userObjectId
+        roleDefinitionId: 'a001fd3d-188f-4b5d-821b-7da978bf7442' // Cognitive Services OpenAI Contributor
+      }
+      {
+        principalId: userObjectId
+        roleDefinitionId: '25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68' // Cognitive Services Contributor
+      }
+      // Azure Storage Accoutn roles for the developer
+      {
+        principalId: userObjectId
+        roleDefinitionId: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe' // Storage Blob Data Contributor
+      }
+      {
+        principalId: userObjectId
+        roleDefinitionId: '17d1049b-9a84-46fb-8f53-869881c3d3ab' // Storage Account Contributor
+      }
+      {
+        principalId: userObjectId
+        roleDefinitionId: '69566ab7-960f-475b-8e7c-b3118f30c6bd' // Storage File Data Privileged Contributor
+      }
+      {
+        principalId: userObjectId
+        roleDefinitionId: '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3' // Storage Table Data Contributor
+      }
+      {
+        principalId: userObjectId
+        roleDefinitionId: '00482a5a-887f-4fb3-b363-3b7fe8e74483' // Key Vault Administrator
+      }
+      {
+        principalId: userObjectId
+        roleDefinitionId: 'f6c7c914-8db3-469d-8ca1-694a8f32e121' // Azure ML Data Scientist
+      }
+    ]
   }
 }
 
@@ -530,3 +696,19 @@ output deploymentInfo object = {
   hubName: hub.outputs.name
   projectName: project.outputs.name
 }
+
+
+// // Create the Machine Learning Compute resource
+// module mlCompute 'modules/mlCompute.bicep' = {
+//   name: 'mlCompute'
+//   params: {
+//     name: empty(mlComputeName) ? toLower('${prefix}-ml-compute-${suffix}') : mlComputeName
+//     location: location
+//     vmSize: mlComputeVmSize
+//     minNodes: mlComputeMinNodes
+//     maxNodes: mlComputeMaxNodes
+//     tags: tags
+//   }
+// }
+
+
