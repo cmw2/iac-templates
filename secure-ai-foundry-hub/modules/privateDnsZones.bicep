@@ -36,7 +36,7 @@ resource mlApiPrivateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
 }
 
 resource mlNotebooksPrivateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
-  name: 'privatelink.notebooks.${toLower(environment().name) == 'azureusgovernment' ? 'usgovcloudapi.net' : 'azureml.net'}'
+  name: 'privatelink.notebooks.${toLower(environment().name) == 'azureusgovernment' ? 'usgovcloudapi.net' : 'azure.net'}'
   location: 'global'
   tags: tags
 }

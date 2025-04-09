@@ -20,7 +20,7 @@ resource mlApiPrivateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' exis
 }
 
 resource mlNotebooksPrivateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
-  name: 'privatelink.notebooks.${toLower(environment().name) == 'azureusgovernment' ? 'usgovcloudapi.net' : 'azureml.net'}'
+  name: 'privatelink.notebooks.${toLower(environment().name) == 'azureusgovernment' ? 'usgovcloudapi.net' : 'azure.net'}'
 }
 
 resource cognitiveServicesPrivateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
